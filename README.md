@@ -28,7 +28,7 @@ To covert the VOC file to CSV file:
 4. After that continue clicking 'Next Image' button on the left tool bar to convert all the images.
 
 To auto label the images:
-1. select the images dir by 'Open Dir' button on the left tool bar, 
+1. select the images dir by 'Open Dir' button on the left tool bar, and wait for tensorflow starting until you see 'thread AutoLabel_CNN is running...' in console,
 2. select file saving dir by 'Change Save Dir' button on the left tool bar, 
 3. check 'Auto Saving' under 'View' menu, 
 4. then click 'Auto Label' under 'AutoLabel' menu to start auto labeling, 
@@ -39,4 +39,6 @@ note:
 1. when you check CSV file and find a wrong label, you can modify it, 
 when you move to next image, you modification will save automatically, 
 but in VOC format, so, if your need CSV format, you need to covert the VOC file to CSV file. 
-2. For now, DO NOT click 'Prv Image' button on the left tool bar, I'm not sure what will happen if you do that.
+2. the converted CSV file will stored in 'file saving location' while the original CSV file is put in 'images location'
+3. For now, DO NOT click 'Prv Image' button on the left tool bar, I'm not sure what will happen if you do that.
+
