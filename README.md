@@ -5,11 +5,11 @@ When trainning a CNN, labeling images is a tiring work.
 So why not use a CNN to finish the most of work for you and you just need to check the result and correct it if the labeling result is wrong. 
 And this project just do things like this.  
 The project is used to labeling the color of traffic lights.
-The project is modified based on the labelImg<https://github.com/tzutalin/labelImg> and 
-the excellent work if identify traffic light color which is done by Francisco Gorina<https://github.com/fgorina> as well as all other group members of Udacity CarND Term3.
+The project is modified based on the `labelImg <https://github.com/tzutalin/labelImg>` and 
+the excellent work if identify traffic light color which is done by `Francisco Gorina <https://github.com/fgorina>` as well as all other group members of Udacity CarND Term3.
 
 To make program work:
-1. you need install all packages as original labelImg<https://github.com/tzutalin/labelImg> required. 
+1. you need install all packages as original `labelImg <https://github.com/tzutalin/labelImg>` required. 
 2. Besides tensor_flow also is required as well as other package required by 'label_files.py'
 
 To check the label result:
@@ -39,4 +39,4 @@ note:
 1. when you check CSV file and find a wrong label, you can modify it, 
 when you move to next image, you modification will save automatically, 
 but in VOC format, so, if your need CSV format, you need to covert the VOC file to CSV file. 
-
+2. For now, DO NOT click 'Prv Image' button on the left tool bar, I'm not sure what will happen if you do that.
