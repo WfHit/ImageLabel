@@ -531,6 +531,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.move(position)
         saveDir = ustr(settings.get(SETTING_SAVE_DIR, None))
         self.lastOpenDir = ustr(settings.get(SETTING_LAST_OPEN_DIR, None))
+        self.cnn_dir = ustr(settings.get(SETTING_CNN_DIR, None))
         if self.defaultSaveDir is None and saveDir is not None and os.path.exists(saveDir):
             self.defaultSaveDir = saveDir
             self.statusBar().showMessage('%s started. Annotation will be saved to %s' %
@@ -1212,12 +1213,18 @@ class MainWindow(QMainWindow, WindowMixin):
         else:
             settings[SETTING_LAST_OPEN_DIR] = ""
 
+        if self.cnn_dir and os.path.exists(self.cnn_dir):
+            settings[SETTING_CNN_DIR] = self.cnn_dir
+        else:
+            settings[SETTING_CNN_DIR] = ""
+            
         settings[SETTING_AUTO_SAVE] = self.autoSaving.isChecked()
         settings[SETTING_SINGLE_CLASS] = self.singleClassMode.isChecked()
         settings[SETTING_PAINT_LABEL] = self.paintLabelsOption.isChecked()
         settings.save()
 
-        self.is_term = True
+        self.autolabelrun = False
+        self.start_event.set()
 
         self.check_label = False
         self.check_event.set()
@@ -1569,15 +1576,23 @@ class MainWindow(QMainWindow, WindowMixin):
             time.sleep(1)
                  
     def func_autoLabel(self):
-        self.autolabelrun = True
-        self.is_term = False
-        print('thread %s is running...' % threading.current_thread().name)
-        self.cnn_dir = ustr(QFileDialog.getExistingDirectory(self,
-                                                     '%s - Open Directory' % __appname__, '.',
+        if not self.autolabelrun :
+            #print('thread %s is running...' % threading.current_thread().name)
+            if self.cnn_dir and os.path.exists(self.cnn_dir):
+                defaultOpenDirPath = self.cnn_dir
+            else:
+                defaultOpenDirPath = os.path.dirname(self.cnn_dir) if self.cnn_dir else '.'
+
+            self.cnn_dir = ustr(QFileDialog.getExistingDirectory(self,
+                                                     '%s - Open Directory' % __appname__, defaultOpenDirPath,
                                                      QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks))
-        thread_cnn = threading.Thread(target=self.auto_lable, name='AutoLabel_CNN')
-        # t.setDaemon(True)
-        thread_cnn.start()
+            thread_cnn = threading.Thread(target=self.auto_lable, name='AutoLabel_CNN')
+            # t.setDaemon(True)
+            self.autolabelrun = True
+            thread_cnn.start()
+        else :
+            self.autolabelrun = False
+            self.start_event.set()
         #t.join()
     
     def func_convertLabel(self):
@@ -1615,7 +1630,7 @@ class MainWindow(QMainWindow, WindowMixin):
             image_name = filename.split("/")[-1].split(".")[-2]
             for (label, xmin, ymin, xmax, ymax) in zip(tVocParseReader.labels,tVocParseReader.xmin_float,tVocParseReader.ymin_float,tVocParseReader.xmax_float,tVocParseReader.ymax_float):
                 #print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(rbox[1])+","+str(rbox[3])+","+str(rbox[0])+","+str(rbox[2])+",0,0,0,0,0", file = images_label_file) 
-                print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(round(xmin,2))+","+str(round(xmax,2))+","+str(round(ymin,2))+","+str(round(ymax,2))+",0,0,0,0,0", file = images_label_file) 
+                print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(round(xmin,4))+","+str(round(xmax,4))+","+str(round(ymin,4))+","+str(round(ymax,4))+",0,0,0,0,0", file = images_label_file) 
         images_label_file.close()
 
     def func_checkLabel(self):
@@ -1788,58 +1803,59 @@ class MainWindow(QMainWindow, WindowMixin):
         #files = glob.glob(self.dirname+"/*.[pj][np]g")    
         with tf.Session(graph=detection_graph) as sess:    
             #for f in files:
-            while not self.is_term :
+            while self.autolabelrun :
                 print('thread %s is running...' % threading.current_thread().name)
                 self.start_event.wait()
                 self.start_event.clear()
-                self.cnn_running = True
-                if len(self.raw_img.shape) < 3:  # sometimes bad images occur (B&W)
-                    continue
-                no_image = self.raw_img[:, :, 0:3]
-                image_np = np.expand_dims(no_image, 0)
-                # Actual detection.
-                (boxes, scores, classes) = sess.run([detection_boxes, detection_scores, detection_classes],
+                if self.autolabelrun :
+                    self.cnn_running = True
+                    if len(self.raw_img.shape) < 3:  # sometimes bad images occur (B&W)
+                        continue
+                    no_image = self.raw_img[:, :, 0:3]
+                    image_np = np.expand_dims(no_image, 0)
+                    # Actual detection.
+                    (boxes, scores, classes) = sess.run([detection_boxes, detection_scores, detection_classes],
                                                     feed_dict={image_tensor: image_np})
-                # Remove unnecessary dimensions
-                boxes = np.squeeze(boxes)
-                scores = np.squeeze(scores)
-                classes = np.squeeze(classes)
-                confidence_cutoff = 0.6
-                # Filter boxes with a confidence score less than `confidence_cutoff`
-                boxes, scores, classes = self.filter_boxes(confidence_cutoff, boxes, scores, classes)
-                # The current box coordinates are normalized to a range between 0 and 1.
-                # This converts the coordinates actual location on the image.
-                width, height = self.image_cnn.size
-                box_coords = self.to_image_coords(boxes, height, width)
-                # class=10 is the traffic light
-                total_color = "Unknown"
-                self.createShape()
-                #images_label_file = open (self.dirname+"/images_label.cvs",'a')
-                for (box, rbox, c, s) in zip(box_coords, boxes, classes, scores):
-                    if int(c) == 10:        # Class 10 is traffic light
-                        bimg = image_np[0, int(box[0]):int(box[2]), int(box[1]):int(box[3]),:]
-                        color = self.get_color(bimg)
-                        if total_color == "Unknown":
-                            total_color = color
-                        elif color == "Orange" and total_color == "Green":
-                            total_color = "Orange"
-                        elif color == "Red":
-                            total_color = "Red"
-                        # Now write for each box.
-                        #print(self.img_name+",freeform,/m/015qff/"+color+","+str(s)+","+str(rbox[1])+","+str(rbox[3])+","+str(rbox[0])+","+str(rbox[2])+",0,0,0,0,0", file = images_label_file)
-                        self.cnn_detect_label = total_color
-                        #print(self.cnn_detect_label)
-                        first_pos = QPointF(box[1], box[0])
-                        second_pos = QPointF(box[3], box[2])
-                        self.canvas.handleDrawing(first_pos) 
-                        self.canvas.line[1] = second_pos
-                        color = self.canvas.current.line_color
-                        self.canvas.line.line_color = color
-                        self.canvas.handleDrawing(second_pos) 
-                        time.sleep(4)
-                #images_label_file.close()
-                self.cnn_running = False                
-        images_label_file.close()
+                    # Remove unnecessary dimensions
+                    boxes = np.squeeze(boxes)
+                    scores = np.squeeze(scores)
+                    classes = np.squeeze(classes)
+                    confidence_cutoff = 0.6
+                    # Filter boxes with a confidence score less than `confidence_cutoff`
+                    boxes, scores, classes = self.filter_boxes(confidence_cutoff, boxes, scores, classes)
+                    # The current box coordinates are normalized to a range between 0 and 1.
+                    # This converts the coordinates actual location on the image.
+                    width, height = self.image_cnn.size
+                    box_coords = self.to_image_coords(boxes, height, width)
+                    # class=10 is the traffic light
+                    total_color = "Unknown"
+                    #self.createShape()
+                    #images_label_file = open (self.dirname+"/images_label.cvs",'a')
+                    for (box, rbox, c, s) in zip(box_coords, boxes, classes, scores):
+                        if int(c) == 10:        # Class 10 is traffic light
+                            bimg = image_np[0, int(box[0]):int(box[2]), int(box[1]):int(box[3]),:]
+                            color = self.get_color(bimg)
+                            if total_color == "Unknown":
+                                total_color = color
+                            elif color == "Orange" and total_color == "Green":
+                                total_color = "Orange"
+                            elif color == "Red":
+                                total_color = "Red"
+                            # Now write for each box.
+                            #print(self.img_name+",freeform,/m/015qff/"+color+","+str(s)+","+str(rbox[1])+","+str(rbox[3])+","+str(rbox[0])+","+str(rbox[2])+",0,0,0,0,0", file = images_label_file)
+                            self.cnn_detect_label = total_color
+                            #print(self.cnn_detect_label)
+                            first_pos = QPointF(box[1], box[0])
+                            second_pos = QPointF(box[3], box[2])
+                            self.canvas.handleDrawing(first_pos) 
+                            self.canvas.line[1] = second_pos
+                            color = self.canvas.current.line_color
+                            self.canvas.line.line_color = color
+                            self.canvas.handleDrawing(second_pos) 
+                            #time.sleep(4)
+                    #images_label_file.close()
+                    self.cnn_running = False                
+        print('thread %s is terminate...' % threading.current_thread().name)
         
 def inverted(color):
     return QColor(*[255 - v for v in color.getRgb()])
