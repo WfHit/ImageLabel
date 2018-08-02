@@ -1598,7 +1598,14 @@ class MainWindow(QMainWindow, WindowMixin):
     def func_convertLabel(self):
         #self.autolabelrun = False
         #self.is_term = True
-        images_label_file = open (self.defaultSaveDir+"/images_label.cvs",'w')
+        csv_file_path = self.defaultSaveDir+"/images_label.cvs"
+        #if not os.path.exists(csv_file_path):
+        #   reply = QMessageBox.information(self,                         
+        #                                "warning",  
+        #                                "file not exist...",  
+        #                                QMessageBox.Yes | QMessageBox.No) 
+        #   return
+        images_label_file = open (csv_file_path,'w')
         print(self.defaultSaveDir+"/images_label.cvs")
         top_title = "ImageID,Source,LabelName,Confidence,XMin,XMax,YMin,YMax,IsOccluded,IsTruncated,IsGroupOf,IsDepiction,IsInside"
         print(top_title, file = images_label_file)
@@ -1629,7 +1636,7 @@ class MainWindow(QMainWindow, WindowMixin):
                     shapes = tYoloParseReader.getShapes()
             image_name = filename.split("/")[-1].split(".")[-2]
             for (label, xmin, ymin, xmax, ymax) in zip(tVocParseReader.labels,tVocParseReader.xmin_float,tVocParseReader.ymin_float,tVocParseReader.xmax_float,tVocParseReader.ymax_float):
-                #print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(rbox[1])+","+str(rbox[3])+","+str(rbox[0])+","+str(rbox[2])+",0,0,0,0,0", file = images_label_file) 
+                print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(round(xmin,4))+","+str(round(xmax,4))+","+str(round(ymin,4))+","+str(round(ymax,4))+",0,0,0,0,0") 
                 print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(round(xmin,4))+","+str(round(xmax,4))+","+str(round(ymin,4))+","+str(round(ymax,4))+",0,0,0,0,0", file = images_label_file) 
         images_label_file.close()
 

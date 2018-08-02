@@ -88,7 +88,7 @@ def generateColorByText(text):
         r = 0
         g = 255
         b = 0
-    elif text == "Yellow" :
+    elif text == "Orange" :
         r = 255
         g = 255
         b = 0
