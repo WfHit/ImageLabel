@@ -937,7 +937,6 @@ class MainWindow(QMainWindow, WindowMixin):
 
         position MUST be in global coordinates.
         """
-        print(14)
 
         if self.autolabelrun :
             text = self.cnn_detect_label
@@ -945,7 +944,6 @@ class MainWindow(QMainWindow, WindowMixin):
             text = self.cnn_detect_label
         else :
             if not self.useDefaultLabelCheckbox.isChecked() or not self.defaultLabelTextLine.text():
-                print(15)
                 if len(self.labelHist) > 0:
                     self.labelDialog = LabelDialog(parent=self, listItem=self.labelHist)
 
@@ -1122,26 +1120,26 @@ class MainWindow(QMainWindow, WindowMixin):
 
             # Label xml file and show bound box according to its filename
             # if self.usingPascalVocFormat is True:
-            if self.defaultSaveDir is not None:
-                basename = os.path.basename(
-                    os.path.splitext(self.filePath)[0])
-                xmlPath = os.path.join(self.defaultSaveDir, basename + XML_EXT)
-                txtPath = os.path.join(self.defaultSaveDir, basename + TXT_EXT)
+            if not (self.check_label or self.autolabelrun) :
+                if self.defaultSaveDir is not None:
+                    basename = os.path.basename(os.path.splitext(self.filePath)[0])
+                    xmlPath = os.path.join(self.defaultSaveDir, basename + XML_EXT)
+                    txtPath = os.path.join(self.defaultSaveDir, basename + TXT_EXT)
 
-                """Annotation file priority:
-                PascalXML > YOLO
-                """
-                if os.path.isfile(xmlPath):
-                    self.loadPascalXMLByFilename(xmlPath)
-                elif os.path.isfile(txtPath):
-                    self.loadYOLOTXTByFilename(txtPath)
-            else:
-                xmlPath = os.path.splitext(filePath)[0] + XML_EXT
-                txtPath = os.path.splitext(filePath)[0] + TXT_EXT
-                if os.path.isfile(xmlPath):
-                    self.loadPascalXMLByFilename(xmlPath)
-                elif os.path.isfile(txtPath):
-                    self.loadYOLOTXTByFilename(txtPath)
+                    """Annotation file priority:
+                    PascalXML > YOLO
+                    """
+                    if os.path.isfile(xmlPath):
+                        self.loadPascalXMLByFilename(xmlPath)
+                    elif os.path.isfile(txtPath):
+                        self.loadYOLOTXTByFilename(txtPath)
+                else:
+                    xmlPath = os.path.splitext(filePath)[0] + XML_EXT
+                    txtPath = os.path.splitext(filePath)[0] + TXT_EXT
+                    if os.path.isfile(xmlPath):
+                        self.loadPascalXMLByFilename(xmlPath)
+                    elif os.path.isfile(txtPath):
+                        self.loadYOLOTXTByFilename(txtPath)
 
             self.setWindowTitle(__appname__ + ' ' + filePath)
 
@@ -1220,6 +1218,10 @@ class MainWindow(QMainWindow, WindowMixin):
         settings.save()
 
         self.is_term = True
+
+        self.check_label = False
+        self.check_event.set()
+
         
     ## User Dialogs ##
 
@@ -1387,10 +1389,7 @@ class MainWindow(QMainWindow, WindowMixin):
             print(filename)
             self.img_name = filename.split("/")[-1].split(".")[-2]
             self.raw_img = np.asarray(self.image_cnn, dtype=np.uint8)
-            print(1)
             self.check_event.set() 
-            print(2)
-            #self.finish_event.wait()
             
     def openFile(self, _value=False):
         if not self.mayContinue():
@@ -1616,7 +1615,7 @@ class MainWindow(QMainWindow, WindowMixin):
             image_name = filename.split("/")[-1].split(".")[-2]
             for (label, xmin, ymin, xmax, ymax) in zip(tVocParseReader.labels,tVocParseReader.xmin_float,tVocParseReader.ymin_float,tVocParseReader.xmax_float,tVocParseReader.ymax_float):
                 #print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(rbox[1])+","+str(rbox[3])+","+str(rbox[0])+","+str(rbox[2])+",0,0,0,0,0", file = images_label_file) 
-                print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(xmin)+","+str(xmax)+","+str(ymin)+","+str(ymax)+",0,0,0,0,0", file = images_label_file) 
+                print(image_name+",freeform,/m/015qff/"+label+","+str(1.0)+","+str(round(xmin,2))+","+str(round(xmax,2))+","+str(round(ymin,2))+","+str(round(ymax,2))+",0,0,0,0,0", file = images_label_file) 
         images_label_file.close()
 
     def func_checkLabel(self):
@@ -1634,58 +1633,53 @@ class MainWindow(QMainWindow, WindowMixin):
 	                        #second_pos = QPointF(box[3], box[2])
 	                        annotation = {'id': row[0], 'label': row[2], 'confidence': row[3], 'x0': row[4], 'x1': row[5], 'y0': row[6], 'y1': row[7]}
 	                        self.annotations.append(annotation)
-	                        print(row[0].split("/")[-1])
+	                        #print(row[0].split("/")[-1])
             self.check_label = True
-            print(3)
             thread_check = threading.Thread(target=self.task_checkLabel, name='AutoLabel_Check')
-            print(4)
             thread_check.start()
         else :
             self.check_label = False
+            self.check_event.set()
 
     def task_checkLabel(self):
-        print(5)
         while self.check_label:
             print('thread %s is running...' % threading.current_thread().name)
-            print(6)
             self.check_event.wait()
             self.check_event.clear()
-            print(7)
+            if self.check_label:
             #self.createShape()  
-            print(8)
-            for anno in self.annotations :
-                print(9)
-                print(self.img_name)
-                print(anno['id'])
-                print(anno['id'].split("/")[-1])
-                if self.img_name == anno['id'].split("/")[-1]:
-                    print(10)
-                    width, height = self.image_cnn.size
-                    self.cnn_detect_label = anno['label'].split("/")[-1]
-                    print(self.cnn_detect_label)
-                    #str(rbox[1])+","+str(rbox[3])+","+str(rbox[0])+","+str(rbox[2])
-                    #'x0': row[4],    'x1': row[5],    'y0': row[6],    'y1': row[7]
-                    #first_pos = QPointF(box[1], box[0])
-                    #second_pos = QPointF(box[3], box[2])
+                for anno in self.annotations :
+                    #print(self.img_name)
+                    #print(anno['id'])
+                    #print(anno['id'].split("/")[-1])
+                    if self.img_name == anno['id'].split("/")[-1]:
+                        width, height = self.image_cnn.size
+                        self.cnn_detect_label = anno['label'].split("/")[-1]
+                        #print(self.cnn_detect_label)
+                        #str(rbox[1])+","+str(rbox[3])+","+str(rbox[0])+","+str(rbox[2])
+                        #'x0': row[4],    'x1': row[5],    'y0': row[6],    'y1': row[7]
+                        #first_pos = QPointF(box[1], box[0])
+                        #second_pos = QPointF(box[3], box[2])
 
-                    #box_coords[:, 0] = boxes[:, 0] * height
-                    #box_coords[:, 1] = boxes[:, 1] * width
-                    #box_coords[:, 2] = boxes[:, 2] * height
-                    #box_coords[:, 3] = boxes[:, 3] * width                        
+                        #box_coords[:, 0] = boxes[:, 0] * height
+                        #box_coords[:, 1] = boxes[:, 1] * width
+                        #box_coords[:, 2] = boxes[:, 2] * height
+                        #box_coords[:, 3] = boxes[:, 3] * width                        
 
-                    box_0 = float(anno['y0']) * height
-                    box_1 = float(anno['x0']) * width
-                    box_2 = float(anno['y1']) * height
-                    box_3 = float(anno['x1']) * width
-                    first_pos = QPointF(box_1, box_0)
-                    second_pos = QPointF(box_3, box_2)
+                        box_0 = float(anno['y0']) * height
+                        box_1 = float(anno['x0']) * width
+                        box_2 = float(anno['y1']) * height
+                        box_3 = float(anno['x1']) * width
+                        first_pos = QPointF(box_1, box_0)
+                        second_pos = QPointF(box_3, box_2)
  
-                    self.canvas.handleDrawing(first_pos) 
-                    self.canvas.line[1] = second_pos
-                    color = self.canvas.current.line_color
-                    self.canvas.line.line_color = color
-                    self.canvas.handleDrawing(second_pos) 
-                #time.sleep(4)
+                        self.canvas.handleDrawing(first_pos) 
+                        self.canvas.line[1] = second_pos
+                        color = self.canvas.current.line_color
+                        self.canvas.line.line_color = color
+                        self.canvas.handleDrawing(second_pos) 
+                    #time.sleep(4)
+        print('thread %s is terminate...' % threading.current_thread().name)
                 
     def filter_boxes(self, min_score, boxes, scores, classes):
         """Return boxes with a confidence >= `min_score`"""

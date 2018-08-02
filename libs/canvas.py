@@ -103,7 +103,6 @@ class Canvas(QWidget):
     def mouseMoveEvent(self, ev):
         """Update line with last point and current coordinates."""
         pos = self.transformPos(ev.pos())
-        #print(3)
         # Update coordinates in status bar if image is opened
         window = self.parent().window()
         if window.filePath is not None:
@@ -199,24 +198,19 @@ class Canvas(QWidget):
         pos = self.transformPos(ev.pos())
         
         if ev.button() == Qt.LeftButton:
-            print(7)
             if self.drawing():
-                print(9)
                 self.handleDrawing(pos)
             else:
-                print(10)
                 self.selectShapePoint(pos)
                 self.prevPoint = pos
                 self.repaint()
         elif ev.button() == Qt.RightButton and self.editing():
-            print(8)
             self.selectShapePoint(pos)
             self.prevPoint = pos
             self.repaint()
 
     def mouseReleaseEvent(self, ev):
         if ev.button() == Qt.RightButton:
-            print(4)
             menu = self.menus[bool(self.selectedShapeCopy)]
             self.restoreCursor()
             if not menu.exec_(self.mapToGlobal(ev.pos()))\
@@ -225,13 +219,11 @@ class Canvas(QWidget):
                 self.selectedShapeCopy = None
                 self.repaint()
         elif ev.button() == Qt.LeftButton and self.selectedShape:
-            print(5)
             if self.selectedVertex():
                 self.overrideCursor(CURSOR_POINT)
             else:
                 self.overrideCursor(CURSOR_GRAB)
         elif ev.button() == Qt.LeftButton:
-            print(6)
             pos = self.transformPos(ev.pos())
             if self.drawing():
                 self.handleDrawing(pos)
@@ -262,7 +254,6 @@ class Canvas(QWidget):
         print("pos.x:",pos.x())
         print("pos.y:",pos.y())
         if self.current and self.current.reachMaxPoints() is False:
-            print("1")
             initPos = self.current[0]
             minX = initPos.x()
             minY = initPos.y()
@@ -274,7 +265,6 @@ class Canvas(QWidget):
             self.current.addPoint(QPointF(minX, maxY))
             self.finalise()
         elif not self.outOfPixmap(pos):
-            print("2")
             self.current = Shape()
             self.current.addPoint(pos)
             self.line.points = [pos, pos]
@@ -477,14 +467,11 @@ class Canvas(QWidget):
 
     def finalise(self):
         assert self.current
-        print(11)
         if self.current.points[0] == self.current.points[-1]:
-            print(12)
             self.current = None
             self.drawingPolygon.emit(False)
             self.update()
             return
-        print(13)
         self.current.close()
         self.shapes.append(self.current)
         self.current = None
